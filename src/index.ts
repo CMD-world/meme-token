@@ -4,7 +4,7 @@ import { SolanaAgentKit, PumpFunTokenOptions } from "solana-agent-kit";
 import { VersionedTransaction, Keypair } from "@solana/web3.js";
 
 // Schema Definitions
-const TokenOptionsSchema = t.Object({
+const TokenOptions = t.Object({
   initialLiquiditySOL: t.Optional(
     t.Number({
       description: "Initial liquidity in SOL",
@@ -29,7 +29,7 @@ const TokenOptionsSchema = t.Object({
   ),
 });
 
-const TokenLaunchRequestSchema = t.Object({
+const TokenLaunchRequest = t.Object({
   tokenName: t.String({
     description: "Name of the token",
     minLength: 1,
@@ -59,10 +59,10 @@ const TokenLaunchRequestSchema = t.Object({
       default: "https://api.devnet.solana.com",
     })
   ),
-  options: t.Optional(TokenOptionsSchema),
+  options: t.Optional(TokenOptions),
 });
 
-const TokenLaunchResponseSchema = t.Object({
+const TokenLaunchResponse = t.Object({
   success: t.Boolean(),
   data: t.Optional(
     t.Object({
@@ -142,8 +142,8 @@ const app = new Elysia()
       }
     },
     {
-      body: TokenLaunchRequestSchema,
-      response: TokenLaunchResponseSchema,
+      body: TokenLaunchRequest,
+      response: TokenLaunchResponse,
       detail: {
         summary: "Launch new meme token",
       },
