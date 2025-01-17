@@ -1,42 +1,17 @@
 import { Elysia, t } from "elysia";
 import { swagger } from "@elysiajs/swagger";
-import { SolanaAgentKit, PumpFunTokenOptions } from "solana-agent-kit";
+import { SolanaAgentKit } from "solana-agent-kit";
 import { VersionedTransaction, Keypair } from "@solana/web3.js";
 
-// Schema Definitions
-const TokenOptions = t.Object({
-  initialLiquiditySOL: t.Optional(
-    t.Number({
-      description: "Initial liquidity in SOL",
-      minimum: 0.0001,
-      default: 0.0001,
-    })
-  ),
-  slippageBps: t.Optional(
-    t.Number({
-      description: "Slippage in basis points",
-      minimum: 1,
-      maximum: 1000,
-      default: 5,
-    })
-  ),
-  priorityFee: t.Optional(
-    t.Number({
-      description: "Priority fee in SOL",
-      minimum: 0.00001,
-      default: 0.00005,
-    })
-  ),
-});
-
-const TokenLaunchRequest = t.Object({
-  tokenName: t.String({
+// Schemas
+const TokenRequest = t.Object({
+  name: t.String({
     description: "Name of the token",
     minLength: 1,
     maxLength: 32,
   }),
-  tokenTicker: t.String({
-    description: "Token ticker symbol",
+  symbol: t.String({
+    description: "Symbol for token",
     minLength: 2,
     maxLength: 10,
     pattern: "^[A-Z0-9]+$",
@@ -56,13 +31,12 @@ const TokenLaunchRequest = t.Object({
   rpcUrl: t.Optional(
     t.String({
       description: "Solana RPC URL",
-      default: "https://api.devnet.solana.com",
+      default: "https://api.mainnet-beta.solana.com",
     })
   ),
-  options: t.Optional(TokenOptions),
 });
 
-const TokenLaunchResponse = t.Object({
+const TokenResponse = t.Object({
   success: t.Boolean(),
   data: t.Optional(
     t.Object({
@@ -78,6 +52,7 @@ const TokenLaunchResponse = t.Object({
     })
   ),
   error: t.Optional(t.String()),
+  logs: t.Optional(t.Array(t.String())),
 });
 
 const app = new Elysia()
@@ -98,25 +73,19 @@ const app = new Elysia()
     async ({ body }) => {
       try {
         const mintKeypair = Keypair.generate();
-        const agent = new SolanaAgentKit(
-          body.privateKey,
-          body.rpcUrl || "https://api.devnet.solana.com",
-          null
-        );
+        const agent = new SolanaAgentKit(body.privateKey, body.rpcUrl, null);
 
         const metadataResponse = await uploadMetadata(
           body.tokenName,
           body.tokenTicker,
           body.description,
-          body.imageUrl,
-          body.options
+          body.imageUrl
         );
 
         const txResponse = await createTokenTransaction(
           agent,
           mintKeypair,
-          metadataResponse,
-          body.options
+          metadataResponse
         );
 
         const txData = await txResponse.arrayBuffer();
@@ -134,16 +103,20 @@ const app = new Elysia()
         };
       } catch (error) {
         console.error("Token launch error:", error);
-        return {
+        const response: any = {
           success: false,
           error:
             error instanceof Error ? error.message : "Unknown error occurred",
         };
+        if (error.logs) {
+          response.logs = error.logs;
+        }
+        return response;
       }
     },
     {
-      body: TokenLaunchRequest,
-      response: TokenLaunchResponse,
+      body: TokenRequest,
+      response: TokenResponse,
       detail: {
         summary: "Launch new meme token",
       },
@@ -155,8 +128,7 @@ async function uploadMetadata(
   tokenName: string,
   tokenTicker: string,
   description: string,
-  imageUrl: string,
-  options?: PumpFunTokenOptions
+  imageUrl: string
 ) {
   // Create form
   const formData = new URLSearchParams();
@@ -184,14 +156,14 @@ async function uploadMetadata(
   });
   if (!response.ok)
     throw new Error(`Metadata upload failed: ${response.statusText}`);
+  console.log(response);
   return response.json();
 }
 
 async function createTokenTransaction(
   agent: SolanaAgentKit,
   mintKeypair: Keypair,
-  metadataResponse: any,
-  options?: PumpFunTokenOptions
+  metadataResponse: any
 ) {
   const response = await fetch("https://pumpportal.fun/api/trade-local", {
     method: "POST",
@@ -206,9 +178,9 @@ async function createTokenTransaction(
       },
       mint: mintKeypair.publicKey.toBase58(),
       denominatedInSol: "true",
-      amount: options?.initialLiquiditySOL || 0.0001,
-      slippage: options?.slippageBps || 5,
-      priorityFee: options?.priorityFee || 0.00005,
+      amount: 0.0001,
+      slippage: 5,
+      priorityFee: 0.000025,
       pool: "pump",
     }),
   });
