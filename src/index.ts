@@ -105,8 +105,7 @@ const app = new Elysia()
         console.error("Token launch error:", error);
         const response: any = {
           success: false,
-          error:
-            error instanceof Error ? error.message : "Unknown error occurred",
+          error: "Failed to launch token",
         };
         if (error.logs) {
           response.logs = error.logs;
@@ -156,7 +155,6 @@ async function uploadMetadata(
   });
   if (!response.ok)
     throw new Error(`Metadata upload failed: ${response.statusText}`);
-  console.log(response);
   return response.json();
 }
 
